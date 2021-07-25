@@ -1,0 +1,23 @@
+{
+  "name": "live_stream_video",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build-client": "node_modules/browserify/bin/cmd.js node_modules/mediasoup-client/lib/index.js -s MediasoupClient -o public/js/mediasoup-client.js",
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "browserify": "^17.0.0",
+    "dotenv": "^10.0.0",
+    "dotenv-parse-variables": "^2.0.0",
+    "express": "^4.17.1",
+    "mediasoup": "^3.7.19",
+    "mediasoup-client": "^3.6.36",
+    "socket.io": "^4.1.3"
+  }
+}
