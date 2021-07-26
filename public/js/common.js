@@ -28,3 +28,30 @@ function disconnectSocket() {
         console.log('socket.io closed..');
     }
 }
+
+// return Promise
+function playVideo(element, stream) {
+    if (element.srcObject) {
+        console.warn('element ALREADY playing, so ignore');
+        return;
+    }
+    element.srcObject = stream;
+    element.volume = 0;
+    return element.play();
+}
+
+function pauseVideo(element) {
+    element.pause();
+    element.srcObject = null;
+}
+
+async function loadDevice(routerRtpCapabilities) {
+    try {
+        device = new MediasoupClient.Device();
+    } catch (error) {
+        if (error.name === 'UnsupportedError') {
+            console.error('browser not supported');
+        }
+    }
+    await device.load({ routerRtpCapabilities });
+}

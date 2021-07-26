@@ -98,6 +98,10 @@ async function init() {
     //let consumerTransport = null;
     //let subscribeConsumer = null;
     let { worker, router } = await helpers_mediasoup.startWorker(mediasoupOptions)
+    // --- multi-consumers --
+    let transports = {};
+    let videoConsumers = {};
+    let audioConsumers = {};
 
     // --- socket.io server ---
     global.io = require('socket.io')(webServer);
@@ -155,29 +159,52 @@ async function init() {
             const { kind, rtpParameters } = data;
             console.log('-- produce --- kind=', kind);
             if (kind === 'video') {
-              videoProducer = await producerTransport.produce({ kind, rtpParameters });
-              videoProducer.observer.on('close', () => {
-                console.log('videoProducer closed ---');
-              })
-              helpers.sendResponse({ id: videoProducer.id }, callback);
+                videoProducer = await producerTransport.produce({ kind, rtpParameters });
+                videoProducer.observer.on('close', () => {
+                    console.log('videoProducer closed ---');
+                })
+                helpers.sendResponse({ id: videoProducer.id }, callback);
             }
             else if (kind === 'audio') {
-              audioProducer = await producerTransport.produce({ kind, rtpParameters });
-              audioProducer.observer.on('close', () => {
-                console.log('audioProducer closed ---');
-              })
-              helpers.sendResponse({ id: audioProducer.id }, callback);
+                audioProducer = await producerTransport.produce({ kind, rtpParameters });
+                audioProducer.observer.on('close', () => {
+                    console.log('audioProducer closed ---');
+                })
+                helpers.sendResponse({ id: audioProducer.id }, callback);
             }
             else {
-              console.error('produce ERROR. BAD kind:', kind);
-              //sendResponse({}, callback);
-              return;
+                console.error('produce ERROR. BAD kind:', kind);
+                //sendResponse({}, callback);
+                return;
             }
-        
+
             // inform clients about new producer
             console.log('--broadcast newProducer -- kind=', kind);
             socket.broadcast.emit('newProducer', { kind: kind });
-          });
+        });
+        // --- consumer viewer ----
+        socket.on('createConsumerTransport', async (data, callback) => {
+            console.log('-- createConsumerTransport ---');
+            const { transport, params } = await helpers_mediasoup.createTransport(router, mediasoupOptions);
+            transports = helpers_mediasoup.addConsumerTrasport(helpers.getId(socket), transport, transports);
+            transport.observer.on('close', () => {
+                const id = helpers.getId(socket);
+                console.log('--- consumerTransport closed. --')
+                let consumer = videoConsumers[helpers.getId(socket)];
+                if (consumer) {
+                    consumer.close();
+                    videoConsumers = helpers_mediasoup.removeVideoConsumer(id, videoConsumers);
+                }
+                consumer = audioConsumers[helpers.getId(socket)];
+                if (consumer) {
+                    consumer.close();
+                    audioConsumers = helpers_mediasoup.removeAudioConsumer(id, audioConsumers);
+                }
+                helpers_mediasoup.removeConsumerTransport(id, transports);
+            });
+            //console.log('-- createTransport params:', params);
+            helpers.sendResponse(params, callback);
+        });
     });
 }
 init()

@@ -5,20 +5,18 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Streamer media soup</title>
-    <!-- import required js -->
+    <title>Viewer media soup</title>
     <script src="js/mediasoup-client.js"></script>
     <script src="socket.io/socket.io.js"></script>
 </head>
 
 <body>
     <div>
-        local video<br />
-        <video id="local_video" autoplay style="width: 240px; height: 180px; border: 1px solid black;"></video>
-        <span id="state_span"></span>
+        remote video<br />
+        <div id="remote_container"></div>
     </div>
     <script src="js/common.js"></script>
-    <script src="js/streamer.js"></script>
+    <script src="js/viewer.js"></script>
 </body>
 
 </html>

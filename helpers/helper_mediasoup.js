@@ -20,3 +20,27 @@ module.exports.createTransport = async function (router, mediasoupOptions) {
         }
     };
 }
+
+module.exports.addConsumerTrasport = function (id, transport, transports) {
+    transports[id] = transport;
+    console.log('consumerTransports count=' + Object.keys(transports).length);
+    return transports;
+}
+
+module.exports.removeVideoConsumer = function (id, videoConsumers) {
+    delete videoConsumers[id];
+    console.log('videoConsumers count=' + Object.keys(videoConsumers).length);
+    return videoConsumers;
+}
+
+module.exports.removeAudioConsumer = function (id, audioConsumers) {
+    delete audioConsumers[id];
+    console.log('audioConsumers count=' + Object.keys(audioConsumers).length);
+    return audioConsumers;
+}
+
+module.exports.removeConsumerTransport = function (id, transports) {
+    delete transports[id];
+    console.log('consumerTransports count=' + Object.keys(transports).length);
+    return transports;
+}

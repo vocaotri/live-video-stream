@@ -61,21 +61,7 @@ function stopLocalStream(stream) {
 
     tracks.forEach(track => track.stop());
 }
-// return Promise
-function playVideo(element, stream) {
-    if (element.srcObject) {
-        console.warn('element ALREADY playing, so ignore');
-        return;
-    }
-    element.srcObject = stream;
-    element.volume = 0;
-    return element.play();
-}
 
-function pauseVideo(element) {
-    element.pause();
-    element.srcObject = null;
-}
 // =========== Get audio and video local ========== 
 async function startMedia() {
     if (localStream) {
@@ -203,14 +189,5 @@ function disconnect() {
 
     disconnectSocket();
 }
-async function loadDevice(routerRtpCapabilities) {
-    try {
-        device = new MediasoupClient.Device();
-    } catch (error) {
-        if (error.name === 'UnsupportedError') {
-            console.error('browser not supported');
-        }
-    }
-    await device.load({ routerRtpCapabilities });
-}
+// auto publish video strem
 publish()
