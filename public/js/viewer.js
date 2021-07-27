@@ -119,8 +119,10 @@ function addRemoteVideo(id) {
     element.width = 240;
     element.height = 180;
     element.volume = 0;
+    element.autoplay = true;
     //element.controls = true;
     element.style = 'border: solid black 1px;';
+
     return element;
 }
 function findRemoteVideo(id) {

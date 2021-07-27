@@ -259,7 +259,7 @@ async function init() {
                         console.error('transport NOT EXIST for id=' + helpers.getId(socket));
                         return;
                     }
-                    const { consumer, params } = await helpers_mediasoup.createConsumer(transport, audioProducer, data.rtpCapabilities); // producer must exist before consume
+                    const { consumer, params } = await helpers_mediasoup.createConsumer(transport, audioProducer, data.rtpCapabilities,router); // producer must exist before consume
                     //subscribeConsumer = consumer;
                     const id = helpers.getId(socket);
                     audioConsumers = helpers_mediasoup.addAudioConsumer(id, consumer, audioConsumers);
