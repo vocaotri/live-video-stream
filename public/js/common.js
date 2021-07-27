@@ -36,7 +36,7 @@ function playVideo(element, stream) {
         return;
     }
     element.srcObject = stream;
-    element.volume = 0;
+    // element.volume = 0;
     return element.play();
 }
 

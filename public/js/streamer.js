@@ -72,14 +72,6 @@ async function startMedia() {
     const useAudio = true;
 
     return await navigator.mediaDevices.getUserMedia({ audio: useAudio, video: useVideo })
-    // .then((stream) => {
-    //     localStream = stream;
-    //     playVideo(localVideo, localStream);
-    // })
-    // .catch(err => {
-    //     console.error('media ERROR:', err);
-    // });
-
 }
 function stopMedia() {
     if (localStream) {

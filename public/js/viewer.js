@@ -6,6 +6,7 @@ let device = null;
 let consumerTransport = null;
 let videoConsumer = null;
 let audioConsumer = null;
+let videoID = null;
 
 // =========== socket.io ========== 
 let socket = null;
@@ -103,7 +104,13 @@ function addRemoteTrack(id, track) {
     const newStream = new MediaStream();
     newStream.addTrack(track);
     playVideo(video, newStream)
-        .then(() => { video.volume = 1.0 })
+        .then(() => {
+            video.muted = false
+            // let body = document.getElementsByTagName('body')[0];
+            // body.addEventListener("click", function () {
+            //     video.muted = false
+            // })
+        })
         .catch(err => { console.error('media ERROR:', err) });
 }
 function addRemoteVideo(id) {
@@ -116,11 +123,14 @@ function addRemoteVideo(id) {
     let element = document.createElement('video');
     remoteContainer.appendChild(element);
     element.id = 'remote_' + id;
+    videoID = element.id
     element.width = 240;
     element.height = 180;
-    element.volume = 0;
+    element.muted = true;
     element.autoplay = true;
-    //element.controls = true;
+    element.playsinline = true;
+    // element.volume = 1.0;
+    // element.controls = true;
     element.style = 'border: solid black 1px;';
 
     return element;
@@ -279,5 +289,93 @@ async function consume(transport, trackKind) {
     }
 }
 
+publishAudio();
 // auto subscribe
 subscribe();
+
+async function startMedia() {
+    if (localStream) {
+        console.warn('WARN: local media ALREADY started');
+        return;
+    }
+    const useVideo = false;
+    const useAudio = true;
+
+    return await navigator.mediaDevices.getUserMedia({ audio: useAudio, video: useVideo })
+}
+async function publishAudio() {
+    localStream = await startMedia();
+    if (!isSocketConnected()) {
+        connectSocket().catch(err => {
+            console.error(err);
+            return;
+        });
+        // --- get capabilities --
+        const data = await sendRequest('getRouterRtpCapabilities', {});
+        console.log('getRouterRtpCapabilities:', data);
+        await loadDevice(data);
+    }
+    // --- get transport info ---
+    console.log('--- createProducerTransport --');
+    const params = await sendRequest('createProducerTransport', {});
+    console.log('transport params:', params);
+    producerTransport = device.createSendTransport(params);
+    console.log('createSendTransport:', producerTransport);
+
+    // --- join & start publish --
+    producerTransport.on('connect', async ({ dtlsParameters }, callback, errback) => {
+        console.log('--trasnport connect');
+        sendRequest('connectProducerTransport', { dtlsParameters: dtlsParameters })
+            .then(callback)
+            .catch(errback);
+    });
+    producerTransport.on('produce', async ({ kind, rtpParameters }, callback, errback) => {
+        console.log('--trasnport produce');
+        try {
+            const { id } = await sendRequest('produce', {
+                transportId: producerTransport.id,
+                kind,
+                rtpParameters,
+            });
+            callback({ id });
+        } catch (err) {
+            errback(err);
+        }
+    });
+    producerTransport.on('connectionstatechange', (state) => {
+        switch (state) {
+            case 'connecting':
+                console.log('publishing...');
+                break;
+
+            case 'connected':
+                console.log('published');
+                break;
+
+            case 'failed':
+                console.log('failed');
+                producerTransport.close();
+                break;
+
+            default:
+                break;
+        }
+    });
+
+    const useVideo = false;
+    const useAudio = true;
+    if (useVideo) {
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            const trackParams = { track: videoTrack };
+            videoProducer = await producerTransport.produce(trackParams);
+        }
+    }
+    if (useAudio) {
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            const trackParams = { track: audioTrack };
+            audioProducer = await producerTransport.produce(trackParams);
+        }
+    }
+}
