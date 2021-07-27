@@ -205,6 +205,106 @@ async function init() {
             //console.log('-- createTransport params:', params);
             helpers.sendResponse(params, callback);
         });
+        socket.on('connectConsumerTransport', async (data, callback) => {
+            console.log('-- connectConsumerTransport ---');
+            let transport = helpers_mediasoup.getConsumerTrasnport(helpers.getId(socket), transports);
+            if (!transport) {
+                console.error('transport NOT EXIST for id=' + helpers.getId(socket));
+                helpers.sendResponse({}, callback);
+                return;
+            }
+            await transport.connect({ dtlsParameters: data.dtlsParameters });
+            helpers.sendResponse({}, callback);
+        });
+        socket.on('consume', async (data, callback) => {
+            const kind = data.kind;
+            console.log('-- consume --kind=' + kind);
+
+            if (kind === 'video') {
+                if (videoProducer) {
+                    let transport = helpers_mediasoup.getConsumerTrasnport(helpers.getId(socket), transports);
+                    if (!transport) {
+                        console.error('transport NOT EXIST for id=' + helpers.getId(socket));
+                        return;
+                    }
+                    const { consumer, params } = await helpers_mediasoup.createConsumer(transport, videoProducer, data.rtpCapabilities, router); // producer must exist before consume
+                    //subscribeConsumer = consumer;
+                    const id = helpers.getId(socket);
+                    videoConsumers = helpers_mediasoup.addVideoConsumer(id, consumer, videoConsumers);
+                    consumer.observer.on('close', () => {
+                        console.log('consumer closed ---');
+                    })
+                    consumer.on('producerclose', () => {
+                        console.log('consumer -- on.producerclose');
+                        consumer.close();
+                        videoConsumers = helpers_mediasoup.removeVideoConsumer(id, videoConsumers);
+
+                        // -- notify to client ---
+                        socket.emit('producerClosed', { localId: id, remoteId: producerSocketId, kind: 'video' });
+                    });
+
+                    console.log('-- consumer ready ---');
+                    helpers.sendResponse(params, callback);
+                }
+                else {
+                    console.log('-- consume, but video producer NOT READY');
+                    const params = { producerId: null, id: null, kind: 'video', rtpParameters: {} };
+                    helpers.sendResponse(params, callback);
+                }
+            }
+            else if (kind === 'audio') {
+                if (audioProducer) {
+                    let transport = helpers_mediasoup.getConsumerTrasnport(helpers.getId(socket), transports);
+                    if (!transport) {
+                        console.error('transport NOT EXIST for id=' + helpers.getId(socket));
+                        return;
+                    }
+                    const { consumer, params } = await helpers_mediasoup.createConsumer(transport, audioProducer, data.rtpCapabilities); // producer must exist before consume
+                    //subscribeConsumer = consumer;
+                    const id = helpers.getId(socket);
+                    audioConsumers = helpers_mediasoup.addAudioConsumer(id, consumer, audioConsumers);
+                    consumer.observer.on('close', () => {
+                        console.log('consumer closed ---');
+                    })
+                    consumer.on('producerclose', () => {
+                        console.log('consumer -- on.producerclose');
+                        consumer.close();
+                        audioConsumers = helpers_mediasoup.removeAudioConsumer(id, audioConsumers);
+
+                        // -- notify to client ---
+                        socket.emit('producerClosed', { localId: id, remoteId: producerSocketId, kind: 'audio' });
+                    });
+
+                    console.log('-- consumer ready ---');
+                    helpers.sendResponse(params, callback);
+                }
+                else {
+                    console.log('-- consume, but audio producer NOT READY');
+                    const params = { producerId: null, id: null, kind: 'audio', rtpParameters: {} };
+                    helpers.sendResponse(params, callback);
+                }
+            }
+            else {
+                console.error('ERROR: UNKNOWN kind=' + kind);
+            }
+        });
+        socket.on('resume', async (data, callback) => {
+            const kind = data.kind;
+            console.log('-- resume -- kind=' + kind);
+            if (kind === 'video') {
+                let consumer = helpers_mediasoup.getVideoConsumer(helpers.getId(socket),videoConsumers);
+                if (!consumer) {
+                    console.error('consumer NOT EXIST for id=' + helpers.getId(socket));
+                    helpers.sendResponse({}, callback);
+                    return;
+                }
+                await consumer.resume();
+                helpers.sendResponse({}, callback);
+            }
+            else {
+                console.warn('NO resume for audio');
+            }
+        });
     });
 }
 init()

@@ -164,6 +164,34 @@ async function subscribe() {
     console.log('transport params:', params);
     consumerTransport = device.createRecvTransport(params);
     console.log('createConsumerTransport:', consumerTransport);
+    // --- join & start publish --
+    consumerTransport.on('connect', async ({ dtlsParameters }, callback, errback) => {
+        console.log('--consumer trasnport connect');
+        sendRequest('connectConsumerTransport', { dtlsParameters: dtlsParameters })
+            .then(callback)
+            .catch(errback);
+    });
+    consumerTransport.on('connectionstatechange', (state) => {
+        switch (state) {
+            case 'connecting':
+                console.log('subscribing...');
+                break;
+
+            case 'connected':
+                console.log('subscribed');
+                break;
+
+            case 'failed':
+                console.log('failed');
+                producerTransport.close();
+                break;
+
+            default:
+                break;
+        }
+    });
+    videoConsumer = await consumeAndResume(consumerTransport, 'video');
+    audioConsumer = await consumeAndResume(consumerTransport, 'audio');
 }
 function disconnect() {
     if (videoConsumer) {
@@ -183,5 +211,71 @@ function disconnect() {
 
     disconnectSocket();
 }
+async function consumeAndResume(transport, kind) {
+    const consumer = await consume(consumerTransport, kind);
+    if (consumer) {
+        console.log('-- track exist, consumer ready. kind=' + kind);
+        if (kind === 'video') {
+            console.log('-- resume kind=' + kind);
+            sendRequest('resume', { kind: kind })
+                .then(() => {
+                    console.log('resume OK');
+                    return consumer;
+                })
+                .catch(err => {
+                    console.error('resume ERROR:', err);
+                    return consumer;
+                });
+        }
+        else {
+            console.log('-- do not resume kind=' + kind);
+        }
+    }
+    else {
+        console.log('-- no consumer yet. kind=' + kind);
+        return null;
+    }
+}
+async function consume(transport, trackKind) {
+    console.log('--start of consume --kind=' + trackKind);
+    const { rtpCapabilities } = device;
+    //const data = await socket.request('consume', { rtpCapabilities });
+    const data = await sendRequest('consume', { rtpCapabilities: rtpCapabilities, kind: trackKind })
+        .catch(err => {
+            console.error('consume ERROR:', err);
+        });
+    const {
+        producerId,
+        id,
+        kind,
+        rtpParameters,
+    } = data;
+
+    if (producerId) {
+        let codecOptions = {};
+        const consumer = await transport.consume({
+            id,
+            producerId,
+            kind,
+            rtpParameters,
+            codecOptions,
+        });
+        //const stream = new MediaStream();
+        //stream.addTrack(consumer.track);
+
+        addRemoteTrack(clientId, consumer.track);
+
+        console.log('--end of consume');
+        //return stream;
+
+        return consumer;
+    }
+    else {
+        console.warn('--- remote producer NOT READY');
+
+        return null;
+    }
+}
+
 // auto subscribe
 subscribe();
