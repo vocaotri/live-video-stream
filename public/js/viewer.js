@@ -7,6 +7,7 @@ let consumerTransport = null;
 let videoConsumer = null;
 let audioConsumer = null;
 let videoID = null;
+let room = getRoomName();
 
 // =========== socket.io ========== 
 let socket = null;
@@ -305,77 +306,77 @@ async function startMedia() {
 }
 async function publishAudio() {
     localStream = await startMedia();
-    if (!isSocketConnected()) {
-        connectSocket().catch(err => {
-            console.error(err);
-            return;
-        });
-        // --- get capabilities --
-        const data = await sendRequest('getRouterRtpCapabilities', {});
-        console.log('getRouterRtpCapabilities:', data);
-        await loadDevice(data);
-    }
+    // if (!isSocketConnected()) {
+    //     connectSocket().catch(err => {
+    //         console.error(err);
+    //         return;
+    //     });
+    // --- get capabilities --
+    // const data = await sendRequest('getRouterRtpCapabilities', {});
+    // console.log('getRouterRtpCapabilities:', data);
+    // await loadDevice(data);
+    // }
     // --- get transport info ---
-    console.log('--- createProducerTransport --');
-    const params = await sendRequest('createProducerTransport', {});
-    console.log('transport params:', params);
-    producerTransport = device.createSendTransport(params);
-    console.log('createSendTransport:', producerTransport);
+    // console.log('--- createProducerTransport --');
+    // const params = await sendRequest('createProducerTransport', {});
+    // console.log('transport params:', params);
+    // producerTransport = device.createSendTransport(params);
+    // console.log('createSendTransport:', producerTransport);
 
     // --- join & start publish --
-    producerTransport.on('connect', async ({ dtlsParameters }, callback, errback) => {
-        console.log('--trasnport connect');
-        sendRequest('connectProducerTransport', { dtlsParameters: dtlsParameters })
-            .then(callback)
-            .catch(errback);
-    });
-    producerTransport.on('produce', async ({ kind, rtpParameters }, callback, errback) => {
-        console.log('--trasnport produce');
-        try {
-            const { id } = await sendRequest('produce', {
-                transportId: producerTransport.id,
-                kind,
-                rtpParameters,
-            });
-            callback({ id });
-        } catch (err) {
-            errback(err);
-        }
-    });
-    producerTransport.on('connectionstatechange', (state) => {
-        switch (state) {
-            case 'connecting':
-                console.log('publishing...');
-                break;
+    // producerTransport.on('connect', async ({ dtlsParameters }, callback, errback) => {
+    //     console.log('--trasnport connect');
+    //     sendRequest('connectProducerTransport', { dtlsParameters: dtlsParameters })
+    //         .then(callback)
+    //         .catch(errback);
+    // });
+    // producerTransport.on('produce', async ({ kind, rtpParameters }, callback, errback) => {
+    //     console.log('--trasnport produce');
+    //     try {
+    //         const { id } = await sendRequest('produce', {
+    //             transportId: producerTransport.id,
+    //             kind,
+    //             rtpParameters,
+    //         });
+    //         callback({ id });
+    //     } catch (err) {
+    //         errback(err);
+    //     }
+    // });
+    // producerTransport.on('connectionstatechange', (state) => {
+    //     switch (state) {
+    //         case 'connecting':
+    //             console.log('publishing...');
+    //             break;
 
-            case 'connected':
-                console.log('published');
-                break;
+    //         case 'connected':
+    //             console.log('published');
+    //             break;
 
-            case 'failed':
-                console.log('failed');
-                producerTransport.close();
-                break;
+    //         case 'failed':
+    //             console.log('failed');
+    //             producerTransport.close();
+    //             break;
 
-            default:
-                break;
-        }
-    });
+    //         default:
+    //             break;
+    //     }
+    // });
 
-    const useVideo = false;
-    const useAudio = true;
-    if (useVideo) {
-        const videoTrack = localStream.getVideoTracks()[0];
-        if (videoTrack) {
-            const trackParams = { track: videoTrack };
-            videoProducer = await producerTransport.produce(trackParams);
-        }
-    }
-    if (useAudio) {
-        const audioTrack = localStream.getAudioTracks()[0];
-        if (audioTrack) {
-            const trackParams = { track: audioTrack };
-            audioProducer = await producerTransport.produce(trackParams);
-        }
-    }
+    // const useVideo = false;
+    // const useAudio = true;
+    // if (useVideo) {
+    //     const videoTrack = localStream.getVideoTracks()[0];
+    //     if (videoTrack) {
+    //         const trackParams = { track: videoTrack };
+    //         videoProducer = await producerTransport.produce(trackParams);
+    //     }
+    // }
+    // if (useAudio) {
+    //     const audioTrack = localStream.getAudioTracks()[0];
+    //     if (audioTrack) {
+    //         const trackParams = { track: audioTrack };
+    //         audioProducer = await producerTransport.produce(trackParams);
+    //     }
+    // }
 }

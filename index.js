@@ -34,6 +34,7 @@ else {
 // ========= mediasoup ===========
 global.mediasoup = require("mediasoup");
 const helpers_mediasoup = require("./helpers/helper_mediasoup");
+const Room = require('./services/room')
 async function init() {
     const mediasoupOptions = {
         // Worker settings
@@ -113,8 +114,23 @@ async function init() {
         socket.on('disconnect', function () {
             // close user connection
             console.log('client disconnected. socket id=' + helpers.getId(socket) + '  , total clients=' + helpers.getClientCount());
-            // cleanUpPeer(socket);
+            cleanUpPeer(socket);
         });
+        // --- setup room ---
+        socket.on('prepare_room', async (data) => {
+            const roomId = data.roomId;
+            const existRoom = Room.getRoom(roomId);
+            if (existRoom) {
+                console.log('--- use exist room. roomId=' + roomId);
+            } else {
+                console.log('--- create new room. roomId=' + roomId);
+                const room = await setupRoom(roomId);
+            }
+
+            // --- socket.io room ---
+            socket.join(roomId);
+            setRoomname(roomId);
+        })
 
         socket.on('error', function (err) {
             console.error('socket ERROR:', err);
@@ -259,7 +275,7 @@ async function init() {
                         console.error('transport NOT EXIST for id=' + helpers.getId(socket));
                         return;
                     }
-                    const { consumer, params } = await helpers_mediasoup.createConsumer(transport, audioProducer, data.rtpCapabilities,router); // producer must exist before consume
+                    const { consumer, params } = await helpers_mediasoup.createConsumer(transport, audioProducer, data.rtpCapabilities, router); // producer must exist before consume
                     //subscribeConsumer = consumer;
                     const id = helpers.getId(socket);
                     audioConsumers = helpers_mediasoup.addAudioConsumer(id, consumer, audioConsumers);
@@ -292,7 +308,7 @@ async function init() {
             const kind = data.kind;
             console.log('-- resume -- kind=' + kind);
             if (kind === 'video') {
-                let consumer = helpers_mediasoup.getVideoConsumer(helpers.getId(socket),videoConsumers);
+                let consumer = helpers_mediasoup.getVideoConsumer(helpers.getId(socket), videoConsumers);
                 if (!consumer) {
                     console.error('consumer NOT EXIST for id=' + helpers.getId(socket));
                     helpers.sendResponse({}, callback);
@@ -306,5 +322,40 @@ async function init() {
             }
         });
     });
+    function cleanUpPeer(socket) {
+        const id = helpers.getId(socket);
+        const consumer = helpers_mediasoup.getVideoConsumer(id, videoConsumers);
+        if (consumer) {
+            consumer.close();
+            videoConsumers = helpers_mediasoup.removeVideoConsumer(id, videoConsumers);
+        }
+
+        const transport = helpers_mediasoup.getConsumerTrasnport(id, transports);
+        if (transport) {
+            transport.close();
+            transports = helpers_mediasoup.removeConsumerTransport(id, transports);
+        }
+
+        if (producerSocketId === id) {
+            console.log('---- cleanup producer ---');
+            if (videoProducer) {
+                videoProducer.close();
+                videoProducer = null;
+            }
+            if (audioProducer) {
+                audioProducer.close();
+                audioProducer = null;
+            }
+
+            if (producerTransport) {
+                producerTransport.close();
+                producerTransport = null;
+            }
+
+            producerSocketId = null;
+        }
+    }
 }
+
+
 init()

@@ -6,6 +6,10 @@ let device = null;
 let producerTransport = null;
 let videoProducer = null;
 let audioProducer = null;
+let roomName = getRoomName();
+if (roomName === null || typeof (roomName) === "undefined" || roomName === "") {
+    throw new Error("Please enter room name exmalple: ?room=mrtri on url");
+}
 
 
 // =========== socket.io ========== 
@@ -21,8 +25,9 @@ function connectSocket() {
     return new Promise((resolve, reject) => {
         socket = io.connect('/');
 
-        socket.on('connect', function (evt) {
+        socket.on('connect',async function (evt) {
             console.log('socket.io connected()');
+            await sendRequest('prepare_room', { roomId: roomName });
         });
         socket.on('error', function (err) {
             console.error('socket.io ERROR:', err);
