@@ -1,4 +1,4 @@
-class Room {
+module.exports.Room = class {
     constructor(name) {
       this.name = name;
       this.producerTransports = {};

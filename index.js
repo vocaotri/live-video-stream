@@ -109,11 +109,12 @@ async function init() {
     const helpers = require('./helpers/helpers');
     console.log('socket.io server start. port=' + webServer.address().port);
     io.on('connection', function (socket) {
-        console.log('client connected. socket id=' + helpers.getId(socket) + '  , total clients=' + helpers.getClientCount());
+        const id = helpers.getId(socket);
+        console.log('client connected. socket id=' + id + '  , total clients=' + helpers.getClientCount());
 
         socket.on('disconnect', function () {
             // close user connection
-            console.log('client disconnected. socket id=' + helpers.getId(socket) + '  , total clients=' + helpers.getClientCount());
+            console.log('client disconnected. socket id=' + id + '  , total clients=' + helpers.getClientCount());
             cleanUpPeer(socket);
         });
         // --- setup room ---
@@ -150,7 +151,7 @@ async function init() {
         // --- producer streamer ----
         socket.on('createProducerTransport', async (data, callback) => {
             console.log('-- createProducerTransport ---');
-            producerSocketId = helpers.getId(socket);
+            producerSocketId = id;
             const { transport, params } = await helpers_mediasoup.createTransport(router, mediasoupOptions);
             producerTransport = transport;
             producerTransport.observer.on('close', () => {
@@ -202,16 +203,16 @@ async function init() {
         socket.on('createConsumerTransport', async (data, callback) => {
             console.log('-- createConsumerTransport ---');
             const { transport, params } = await helpers_mediasoup.createTransport(router, mediasoupOptions);
-            transports = helpers_mediasoup.addConsumerTrasport(helpers.getId(socket), transport, transports);
+            transports = helpers_mediasoup.addConsumerTrasport(id, transport, transports);
             transport.observer.on('close', () => {
-                const id = helpers.getId(socket);
+                
                 console.log('--- consumerTransport closed. --')
-                let consumer = videoConsumers[helpers.getId(socket)];
+                let consumer = videoConsumers[id];
                 if (consumer) {
                     consumer.close();
                     videoConsumers = helpers_mediasoup.removeVideoConsumer(id, videoConsumers);
                 }
-                consumer = audioConsumers[helpers.getId(socket)];
+                consumer = audioConsumers[id];
                 if (consumer) {
                     consumer.close();
                     audioConsumers = helpers_mediasoup.removeAudioConsumer(id, audioConsumers);
@@ -223,9 +224,9 @@ async function init() {
         });
         socket.on('connectConsumerTransport', async (data, callback) => {
             console.log('-- connectConsumerTransport ---');
-            let transport = helpers_mediasoup.getConsumerTrasnport(helpers.getId(socket), transports);
+            let transport = helpers_mediasoup.getConsumerTrasnport(id, transports);
             if (!transport) {
-                console.error('transport NOT EXIST for id=' + helpers.getId(socket));
+                console.error('transport NOT EXIST for id=' + id);
                 helpers.sendResponse({}, callback);
                 return;
             }
@@ -235,17 +236,15 @@ async function init() {
         socket.on('consume', async (data, callback) => {
             const kind = data.kind;
             console.log('-- consume --kind=' + kind);
-
             if (kind === 'video') {
                 if (videoProducer) {
-                    let transport = helpers_mediasoup.getConsumerTrasnport(helpers.getId(socket), transports);
+                    let transport = helpers_mediasoup.getConsumerTrasnport(id, transports);
                     if (!transport) {
-                        console.error('transport NOT EXIST for id=' + helpers.getId(socket));
+                        console.error('transport NOT EXIST for id=' + id);
                         return;
                     }
                     const { consumer, params } = await helpers_mediasoup.createConsumer(transport, videoProducer, data.rtpCapabilities, router); // producer must exist before consume
                     //subscribeConsumer = consumer;
-                    const id = helpers.getId(socket);
                     videoConsumers = helpers_mediasoup.addVideoConsumer(id, consumer, videoConsumers);
                     consumer.observer.on('close', () => {
                         console.log('consumer closed ---');
@@ -270,14 +269,13 @@ async function init() {
             }
             else if (kind === 'audio') {
                 if (audioProducer) {
-                    let transport = helpers_mediasoup.getConsumerTrasnport(helpers.getId(socket), transports);
+                    let transport = helpers_mediasoup.getConsumerTrasnport(id, transports);
                     if (!transport) {
-                        console.error('transport NOT EXIST for id=' + helpers.getId(socket));
+                        console.error('transport NOT EXIST for id=' + id);
                         return;
                     }
                     const { consumer, params } = await helpers_mediasoup.createConsumer(transport, audioProducer, data.rtpCapabilities, router); // producer must exist before consume
                     //subscribeConsumer = consumer;
-                    const id = helpers.getId(socket);
                     audioConsumers = helpers_mediasoup.addAudioConsumer(id, consumer, audioConsumers);
                     consumer.observer.on('close', () => {
                         console.log('consumer closed ---');
@@ -308,9 +306,9 @@ async function init() {
             const kind = data.kind;
             console.log('-- resume -- kind=' + kind);
             if (kind === 'video') {
-                let consumer = helpers_mediasoup.getVideoConsumer(helpers.getId(socket), videoConsumers);
+                let consumer = helpers_mediasoup.getVideoConsumer(id, videoConsumers);
                 if (!consumer) {
-                    console.error('consumer NOT EXIST for id=' + helpers.getId(socket));
+                    console.error('consumer NOT EXIST for id=' + id);
                     helpers.sendResponse({}, callback);
                     return;
                 }
