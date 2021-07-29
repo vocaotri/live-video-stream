@@ -91,20 +91,7 @@ async function init() {
             initialAvailableOutgoingBitrate: 1000000,
         }
     };
-
-    // let worker = null;
-    // let router = null;
-    // let producerTransport = null;
-    // let videoProducer = null;
-    // let audioProducer = null;
-    // let producerSocketId = null;
-    //let consumerTransport = null;
-    //let subscribeConsumer = null;
     let { worker } = await helpers_mediasoup.startWorker(mediasoupOptions)
-    // --- multi-consumers --
-    // let transports = {};
-    // let videoConsumers = {};
-    // let audioConsumers = {};
 
     // --- socket.io server ---
     global.io = require('socket.io')(webServer);
@@ -212,7 +199,6 @@ async function init() {
                 helpers_mediasoup.removeConsumerSetDeep(room, localId);
                 helpers_mediasoup.removeConsumerTransport(room, id);
             });
-            //console.log('-- createTransport params:', params);
             helpers.sendResponse(params, callback);
         });
         socket.on('connectConsumerTransport', async (data, callback) => {
@@ -222,7 +208,6 @@ async function init() {
             let transport = helpers_mediasoup.getConsumerTrasnport(room, id);
             if (!transport) {
                 console.error('transport NOT EXIST for id=' + id);
-                // helpers.sendResponse({}, callback);
                 return;
             }
             await transport.connect({ dtlsParameters: data.dtlsParameters });
