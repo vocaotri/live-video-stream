@@ -1,10 +1,10 @@
 module.exports.startWorker = async function (mediasoupOptions) {
     const mediaCodecs = mediasoupOptions.router.mediaCodecs;
     worker = await mediasoup.createWorker();
-    router = await worker.createRouter({ mediaCodecs });
+    // router = await worker.createRouter({ mediaCodecs });
     //producerTransport = await router.createWebRtcTransport(mediasoupOptions.webRtcTransport);
     console.log('-- mediasoup worker start. --')
-    return { worker, router }
+    return { worker }
 }
 
 module.exports.createTransport = async function (router, mediasoupOptions) {
@@ -19,6 +19,28 @@ module.exports.createTransport = async function (router, mediasoupOptions) {
             dtlsParameters: transport.dtlsParameters
         }
     };
+}
+
+module.exports.addProducerTrasport = function (room, id, transport) {
+    room.addProducerTrasport(id, transport);
+    console.log('=== addProducerTrasport use room=%s ===', room.name);
+}
+
+module.exports.removeProducer = function (room, id, kind) {
+    room.removeProducer(id, kind);
+}
+
+module.exports.addProducer = function (room, id, producer, kind) {
+    room.addProducer(id, producer, kind);
+    console.log('=== addProducer use room=%s ===', room.name);
+}
+
+module.exports.removeProducerTransport = function (room, id) {
+    room.removeProducerTransport(id);
+}
+
+module.exports.getProducer = function (room, id, kind) {
+    return room.getProducer(id, kind);
 }
 
 module.exports.getConsumerTrasnport = function (id, transports) {

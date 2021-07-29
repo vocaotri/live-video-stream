@@ -25,7 +25,7 @@ function connectSocket() {
     return new Promise((resolve, reject) => {
         socket = io.connect('/');
 
-        socket.on('connect',async function (evt) {
+        socket.on('connect', async function (evt) {
             console.log('socket.io connected()');
             await sendRequest('prepare_room', { roomId: roomName });
         });
@@ -95,13 +95,13 @@ async function publish() {
             return;
         });
         // --- get capabilities --
-        const data = await sendRequest('getRouterRtpCapabilities', {});
+        const data = await sendRequest('getRouterRtpCapabilities', { roomName: roomName });
         console.log('getRouterRtpCapabilities:', data);
         await loadDevice(data);
     }
     // --- get transport info ---
     console.log('--- createProducerTransport --');
-    const params = await sendRequest('createProducerTransport', {});
+    const params = await sendRequest('createProducerTransport', { roomName: roomName });
     console.log('transport params:', params);
     producerTransport = device.createSendTransport(params);
     console.log('createSendTransport:', producerTransport);
@@ -109,7 +109,7 @@ async function publish() {
     // --- join & start publish --
     producerTransport.on('connect', async ({ dtlsParameters }, callback, errback) => {
         console.log('--trasnport connect');
-        sendRequest('connectProducerTransport', { dtlsParameters: dtlsParameters })
+        sendRequest('connectProducerTransport', { dtlsParameters: dtlsParameters, roomName: roomName })
             .then(callback)
             .catch(errback);
     });
@@ -120,6 +120,7 @@ async function publish() {
                 transportId: producerTransport.id,
                 kind,
                 rtpParameters,
+                roomName: roomName
             });
             callback({ id });
         } catch (err) {

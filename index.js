@@ -31,10 +31,12 @@ else {
         console.log('Web server start. http://' + env.HOST_NAME + ':' + webServer.address().port + '/');
     });
 }
+// ========= room ===========
+global.Room = require('./services/room').Room
 // ========= mediasoup ===========
 global.mediasoup = require("mediasoup");
 const helpers_mediasoup = require("./helpers/helper_mediasoup");
-const Room = require('./services/room')
+
 async function init() {
     const mediasoupOptions = {
         // Worker settings
@@ -92,13 +94,13 @@ async function init() {
 
     // let worker = null;
     // let router = null;
-    let producerTransport = null;
-    let videoProducer = null;
+    // let producerTransport = null;
+    // let videoProducer = null;
     let audioProducer = null;
     let producerSocketId = null;
     //let consumerTransport = null;
     //let subscribeConsumer = null;
-    let { worker, router } = await helpers_mediasoup.startWorker(mediasoupOptions)
+    let { worker } = await helpers_mediasoup.startWorker(mediasoupOptions)
     // --- multi-consumers --
     let transports = {};
     let videoConsumers = {};
@@ -140,6 +142,7 @@ async function init() {
             console.error('client connection error', err);
         });
         socket.on('getRouterRtpCapabilities', (data, callback) => {
+            const { router } = Room.getRoom(data.roomName);
             if (router) {
                 console.log('getRouterRtpCapabilities: ', router.rtpCapabilities);
                 helpers.sendResponse(router.rtpCapabilities, callback);
@@ -150,54 +153,57 @@ async function init() {
         });
         // --- producer streamer ----
         socket.on('createProducerTransport', async (data, callback) => {
+            const room = Room.getRoom(data.roomName);
             console.log('-- createProducerTransport ---');
             producerSocketId = id;
-            const { transport, params } = await helpers_mediasoup.createTransport(router, mediasoupOptions);
+            const { transport, params } = await helpers_mediasoup.createTransport(room.router, mediasoupOptions);
+            helpers_mediasoup.addProducerTrasport(room, id, transport);
             producerTransport = transport;
             producerTransport.observer.on('close', () => {
+                const videoProducer = helpers_mediasoup.getProducer(room, id, 'video');
                 if (videoProducer) {
                     videoProducer.close();
-                    videoProducer = null;
+                    helpers_mediasoup.removeProducer(room, id, 'video');
                 }
+                const audioProducer = helpers_mediasoup.getProducer(room, id, 'audio');
                 if (audioProducer) {
                     audioProducer.close();
-                    audioProducer = null;
+                    helpers_mediasoup.removeProducer(room, id, 'audio');
                 }
-                producerTransport = null;
+                helpers_mediasoup.removeProducerTransport(room, id);
             });
             //console.log('-- createProducerTransport params:', params);
             helpers.sendResponse(params, callback);
         });
         socket.on('connectProducerTransport', async (data, callback) => {
-            await producerTransport.connect({ dtlsParameters: data.dtlsParameters });
+            const room = Room.getRoom(data.roomName);
+            let transport = room.getProducerTrasnport(id);
+            await transport.connect({ dtlsParameters: data.dtlsParameters });
             helpers.sendResponse({}, callback);
         });
         socket.on('produce', async (data, callback) => {
+            const room = Room.getRoom(data.roomName);
             const { kind, rtpParameters } = data;
             console.log('-- produce --- kind=', kind);
-            if (kind === 'video') {
-                videoProducer = await producerTransport.produce({ kind, rtpParameters });
-                videoProducer.observer.on('close', () => {
-                    console.log('videoProducer closed ---');
-                })
-                helpers.sendResponse({ id: videoProducer.id }, callback);
-            }
-            else if (kind === 'audio') {
-                audioProducer = await producerTransport.produce({ kind, rtpParameters });
-                audioProducer.observer.on('close', () => {
-                    console.log('audioProducer closed ---');
-                })
-                helpers.sendResponse({ id: audioProducer.id }, callback);
-            }
-            else {
-                console.error('produce ERROR. BAD kind:', kind);
-                //sendResponse({}, callback);
+            const transport = room.getProducerTrasnport(id);
+            if (!transport) {
+                console.error('transport NOT EXIST for id=' + id);
                 return;
             }
-
-            // inform clients about new producer
-            console.log('--broadcast newProducer -- kind=', kind);
-            socket.broadcast.emit('newProducer', { kind: kind });
+            const producer = await transport.produce({ kind, rtpParameters });
+            helpers_mediasoup.addProducer(room, id, producer, kind);
+            producer.observer.on('close', () => {
+                console.log('producer closed --- kind=' + kind);
+            })
+            helpers.sendResponse({ id: producer.id }, callback);
+            if (room) {
+                console.log('--broadcast room=%s newProducer ---', room.name);
+                socket.broadcast.to(room.name).emit('newProducer', { socketId: id, producerId: producer.id, kind: producer.kind });
+            }
+            else {
+                console.log('--broadcast newProducer ---');
+                socket.broadcast.emit('newProducer', { socketId: id, producerId: producer.id, kind: producer.kind });
+            }
         });
         // --- consumer viewer ----
         socket.on('createConsumerTransport', async (data, callback) => {
@@ -205,7 +211,7 @@ async function init() {
             const { transport, params } = await helpers_mediasoup.createTransport(router, mediasoupOptions);
             transports = helpers_mediasoup.addConsumerTrasport(id, transport, transports);
             transport.observer.on('close', () => {
-                
+
                 console.log('--- consumerTransport closed. --')
                 let consumer = videoConsumers[id];
                 if (consumer) {
@@ -319,6 +325,14 @@ async function init() {
                 console.warn('NO resume for audio');
             }
         });
+        function setRoomname(room) {
+            socket.roomname = room;
+        }
+
+        function getRoomname() {
+            const room = socket.roomname;
+            return room;
+        }
     });
     function cleanUpPeer(socket) {
         const id = helpers.getId(socket);
@@ -352,6 +366,23 @@ async function init() {
 
             producerSocketId = null;
         }
+    }
+    async function setupRoom(name) {
+        const room = new Room(name);
+        const mediaCodecs = mediasoupOptions.router.mediaCodecs;
+        const router = await worker.createRouter({ mediaCodecs });
+        router.roomname = name;
+
+        router.observer.on('close', () => {
+            console.log('-- router closed. room=%s', name);
+        });
+        router.observer.on('newtransport', transport => {
+            console.log('-- router newtransport. room=%s', name);
+        });
+
+        room.router = router;
+        Room.addRoom(room, name);
+        return room;
     }
 }
 
