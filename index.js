@@ -96,15 +96,15 @@ async function init() {
     // let router = null;
     // let producerTransport = null;
     // let videoProducer = null;
-    let audioProducer = null;
-    let producerSocketId = null;
+    // let audioProducer = null;
+    // let producerSocketId = null;
     //let consumerTransport = null;
     //let subscribeConsumer = null;
     let { worker } = await helpers_mediasoup.startWorker(mediasoupOptions)
     // --- multi-consumers --
-    let transports = {};
-    let videoConsumers = {};
-    let audioConsumers = {};
+    // let transports = {};
+    // let videoConsumers = {};
+    // let audioConsumers = {};
 
     // --- socket.io server ---
     global.io = require('socket.io')(webServer);
@@ -118,7 +118,7 @@ async function init() {
             const roomName = getRoomname();
             // close user connection
             console.log('client disconnected. socket id=' + id + '  , total clients=' + helpers.getClientCount());
-            // cleanUpPeer(roomName, socket);
+            cleanUpPeer(roomName, socket);
             // --- socket.io room ---
             socket.leave(roomName);
         });
@@ -203,6 +203,7 @@ async function init() {
         // --- consumer viewer ----
         socket.on('createConsumerTransport', async (data, callback) => {
             const room = Room.getRoom(data.roomName);
+            setRoomname(data.roomName);
             console.log('-- createConsumerTransport ---');
             const { transport, params } = await helpers_mediasoup.createTransport(room.router, mediasoupOptions);
             helpers_mediasoup.addConsumerTrasport(room, id, transport);
@@ -315,29 +316,31 @@ async function init() {
     });
     function cleanUpPeer(roomname, socket) {
         const id = helpers.getId(socket);
-        helpers_mediasoup.removeConsumerSetDeep(roomname, id);
         const room = Room.getRoom(roomname);
-        const transport = helpers_mediasoup.getConsumerTrasnport(room, id);
-        if (transport) {
-            transport.close();
-            helpers_mediasoup.removeConsumerTransport(room, id);
+        if (room) {
+            const transport = helpers_mediasoup.getConsumerTrasnport(room, id);
+            if (transport) {
+                transport.close();
+                helpers_mediasoup.removeConsumerTransport(room, id);
+            }
+
+            const videoProducer = helpers_mediasoup.getProducer(room, id, 'video');
+            if (videoProducer) {
+                videoProducer.close();
+                helpers_mediasoup.removeProducer(room, id, 'video');
+            }
+            const audioProducer = helpers_mediasoup.getProducer(room, id, 'audio');
+            if (audioProducer) {
+                audioProducer.close();
+                helpers_mediasoup.removeProducer(room, id, 'audio');
+            }
+            const producerTransport = helpers_mediasoup.getProducerTrasnport(room, id);
+            if (producerTransport) {
+                producerTransport.close();
+                helpers_mediasoup.removeProducerTransport(room, id);
+            }
         }
 
-        const videoProducer = helpers_mediasoup.getProducer(room, id, 'video');
-        if (videoProducer) {
-            videoProducer.close();
-            helpers_mediasoup.removeProducer(room, id, 'video');
-        }
-        const audioProducer = helpers_mediasoup.getProducer(room, id, 'audio');
-        if (audioProducer) {
-            audioProducer.close();
-            helpers_mediasoup.removeProducer(room, id, 'audio');
-        }
-        const producerTransport = helpers_mediasoup.getProducerTrasnport(room, id);
-        if (producerTransport) {
-            producerTransport.close();
-            helpers_mediasoup.removeProducerTransport(room, id);
-        }
     }
     async function setupRoom(name) {
         const room = new Room(name);

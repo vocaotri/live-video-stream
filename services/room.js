@@ -134,7 +134,6 @@ class Room {
 
   removeConsumerSetDeep(localId) {
     const videoSet = this.getConsumerSet(localId, 'video');
-    delete this.videoConsumerSets[localId];
     if (videoSet) {
       for (const key in videoSet) {
         const consumer = videoSet[key];
@@ -144,9 +143,9 @@ class Room {
 
       console.log('room=%s removeConsumerSetDeep video consumers count=%d', this.name, Object.keys(videoSet).length);
     }
+    delete this.videoConsumerSets[localId];
 
     const audioSet = this.getConsumerSet(localId, 'audio');
-    delete this.audioConsumerSets[localId];
     if (audioSet) {
       for (const key in audioSet) {
         const consumer = audioSet[key];
@@ -156,6 +155,7 @@ class Room {
 
       console.log('room=%s removeConsumerSetDeep audio consumers count=%d', this.name, Object.keys(audioSet).length);
     }
+    delete this.audioConsumerSets[localId];
   }
 
   getConsumer(localId, remoteId, kind) {
@@ -216,5 +216,4 @@ class Room {
     delete Room.rooms[name];
   }
 }
-
 module.exports.Room = Room;

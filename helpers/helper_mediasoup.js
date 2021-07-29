@@ -140,6 +140,6 @@ module.exports.removeAudioConsumer = function (id, audioConsumers) {
     return audioConsumers
 }
 
-module.exports.getVideoConsumer = function (room,id, kind) {
+module.exports.getVideoConsumer = function (room, id, kind) {
     return room.getConsumerSet(id, kind)
 }
