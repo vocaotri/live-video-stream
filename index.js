@@ -118,7 +118,7 @@ async function init() {
             const roomName = getRoomname();
             // close user connection
             console.log('client disconnected. socket id=' + id + '  , total clients=' + helpers.getClientCount());
-            cleanUpPeer(roomName, socket);
+            // cleanUpPeer(roomName, socket);
             // --- socket.io room ---
             socket.leave(roomName);
         });
@@ -144,7 +144,7 @@ async function init() {
             console.error('client connection error', err);
         });
         socket.on('getRouterRtpCapabilities', (data, callback) => {
-            getRouterRTP(data, callback);
+            getRouterRTP(data, callback, 0);
         });
         // --- producer streamer ----
         socket.on('createProducerTransport', async (data, callback) => {
@@ -202,33 +202,26 @@ async function init() {
         });
         // --- consumer viewer ----
         socket.on('createConsumerTransport', async (data, callback) => {
+            const room = Room.getRoom(data.roomName);
             console.log('-- createConsumerTransport ---');
-            const { transport, params } = await helpers_mediasoup.createTransport(router, mediasoupOptions);
-            transports = helpers_mediasoup.addConsumerTrasport(id, transport, transports);
+            const { transport, params } = await helpers_mediasoup.createTransport(room.router, mediasoupOptions);
+            helpers_mediasoup.addConsumerTrasport(room, id, transport);
             transport.observer.on('close', () => {
-
                 console.log('--- consumerTransport closed. --')
-                let consumer = videoConsumers[id];
-                if (consumer) {
-                    consumer.close();
-                    videoConsumers = helpers_mediasoup.removeVideoConsumer(id, videoConsumers);
-                }
-                consumer = audioConsumers[id];
-                if (consumer) {
-                    consumer.close();
-                    audioConsumers = helpers_mediasoup.removeAudioConsumer(id, audioConsumers);
-                }
-                helpers_mediasoup.removeConsumerTransport(id, transports);
+                helpers_mediasoup.removeConsumerSetDeep(room, localId);
+                helpers_mediasoup.removeConsumerTransport(room, id);
             });
             //console.log('-- createTransport params:', params);
             helpers.sendResponse(params, callback);
         });
         socket.on('connectConsumerTransport', async (data, callback) => {
+            const room = Room.getRoom(data.roomName);
+            console.log(room)
             console.log('-- connectConsumerTransport ---');
-            let transport = helpers_mediasoup.getConsumerTrasnport(id, transports);
+            let transport = helpers_mediasoup.getConsumerTrasnport(room, id);
             if (!transport) {
                 console.error('transport NOT EXIST for id=' + id);
-                helpers.sendResponse({}, callback);
+                // helpers.sendResponse({}, callback);
                 return;
             }
             await transport.connect({ dtlsParameters: data.dtlsParameters });
@@ -236,78 +229,45 @@ async function init() {
         });
         socket.on('consume', async (data, callback) => {
             const kind = data.kind;
+            const room = Room.getRoom(data.roomName);
+            const producerSocketId = room.getOwnStream();
             console.log('-- consume --kind=' + kind);
-            if (kind === 'video') {
-                if (videoProducer) {
-                    let transport = helpers_mediasoup.getConsumerTrasnport(id, transports);
-                    if (!transport) {
-                        console.error('transport NOT EXIST for id=' + id);
-                        return;
-                    }
-                    const { consumer, params } = await helpers_mediasoup.createConsumer(transport, videoProducer, data.rtpCapabilities, router); // producer must exist before consume
-                    //subscribeConsumer = consumer;
-                    videoConsumers = helpers_mediasoup.addVideoConsumer(id, consumer, videoConsumers);
-                    consumer.observer.on('close', () => {
-                        console.log('consumer closed ---');
-                    })
-                    consumer.on('producerclose', () => {
-                        console.log('consumer -- on.producerclose');
-                        consumer.close();
-                        videoConsumers = helpers_mediasoup.removeVideoConsumer(id, videoConsumers);
-
-                        // -- notify to client ---
-                        socket.emit('producerClosed', { localId: id, remoteId: producerSocketId, kind: 'video' });
-                    });
-
-                    console.log('-- consumer ready ---');
-                    helpers.sendResponse(params, callback);
+            const producer = helpers_mediasoup.getProducer(room, producerSocketId, kind);
+            if (producer) {
+                let transport = helpers_mediasoup.getConsumerTrasnport(room, id);
+                if (!transport) {
+                    console.error('transport NOT EXIST for id=' + id);
+                    return;
                 }
-                else {
-                    console.log('-- consume, but video producer NOT READY');
-                    const params = { producerId: null, id: null, kind: 'video', rtpParameters: {} };
-                    helpers.sendResponse(params, callback);
-                }
-            }
-            else if (kind === 'audio') {
-                if (audioProducer) {
-                    let transport = helpers_mediasoup.getConsumerTrasnport(id, transports);
-                    if (!transport) {
-                        console.error('transport NOT EXIST for id=' + id);
-                        return;
-                    }
-                    const { consumer, params } = await helpers_mediasoup.createConsumer(transport, audioProducer, data.rtpCapabilities, router); // producer must exist before consume
-                    //subscribeConsumer = consumer;
-                    audioConsumers = helpers_mediasoup.addAudioConsumer(id, consumer, audioConsumers);
-                    consumer.observer.on('close', () => {
-                        console.log('consumer closed ---');
-                    })
-                    consumer.on('producerclose', () => {
-                        console.log('consumer -- on.producerclose');
-                        consumer.close();
-                        audioConsumers = helpers_mediasoup.removeAudioConsumer(id, audioConsumers);
+                const { consumer, params } = await helpers_mediasoup.createConsumer(transport, producer, data.rtpCapabilities, room.router); // producer must exist before consume
+                //subscribeConsumer = consumer;
+                helpers_mediasoup.addConsumerVA(room, id, consumer, kind);
+                consumer.observer.on('close', () => {
+                    console.log('consumer closed ---');
+                })
+                consumer.on('producerclose', () => {
+                    console.log('consumer -- on.producerclose');
+                    consumer.close();
+                    helpers_mediasoup.removeConsumerSetDeep(room.name, id);
 
-                        // -- notify to client ---
-                        socket.emit('producerClosed', { localId: id, remoteId: producerSocketId, kind: 'audio' });
-                    });
-
-                    console.log('-- consumer ready ---');
-                    helpers.sendResponse(params, callback);
-                }
-                else {
-                    console.log('-- consume, but audio producer NOT READY');
-                    const params = { producerId: null, id: null, kind: 'audio', rtpParameters: {} };
-                    helpers.sendResponse(params, callback);
-                }
+                    // -- notify to client ---
+                    socket.emit('producerClosed', { localId: id, remoteId: producerSocketId, kind: kind });
+                });
+                console.log('-- consumer ready ---');
+                helpers.sendResponse(params, callback);
             }
             else {
-                console.error('ERROR: UNKNOWN kind=' + kind);
+                console.log('-- consume, but producer NOT READY');
+                const params = { producerId: null, id: null, kind: kind, rtpParameters: {} };
+                helpers.sendResponse(params, callback);
             }
         });
         socket.on('resume', async (data, callback) => {
+            const room = Room.getRoom(data.roomName);
             const kind = data.kind;
             console.log('-- resume -- kind=' + kind);
             if (kind === 'video') {
-                let consumer = helpers_mediasoup.getVideoConsumer(id, videoConsumers);
+                let consumer = helpers_mediasoup.getVideoConsumer(room, id, kind);
                 if (!consumer) {
                     console.error('consumer NOT EXIST for id=' + id);
                     helpers.sendResponse({}, callback);
@@ -324,9 +284,9 @@ async function init() {
             socket.roomname = room;
         }
 
-        function getRouterRTP(data, callback) {
+        function getRouterRTP(data, callback, numOfTries) {
             const room = Room.getRoom(data.roomName);
-            let numOfTries = 0;
+            numOfTries++;
             if (room) {
                 const { router } = room;
                 if (router) {
@@ -339,7 +299,7 @@ async function init() {
             } else if (numOfTries < 10) {
                 setTimeout(() => {
                     console.log('try to get room');
-                    getRouterRTP(data, callback);
+                    getRouterRTP(data, callback, numOfTries);
                     numOfTries++;
                     console.log("Number of trying: " + numOfTries);
                 }, 500);

@@ -23,8 +23,10 @@ module.exports.createTransport = async function (router, mediasoupOptions) {
 
 module.exports.addProducerTrasport = function (room, id, transport) {
     room.addProducerTrasport(id, transport);
+    room.addOwnStream(id);
     console.log('=== addProducerTrasport use room=%s ===', room.name);
 }
+
 
 module.exports.removeProducer = function (room, id, kind) {
     room.removeProducer(id, kind);
@@ -56,10 +58,9 @@ module.exports.getProducerTrasnport = function (room, id) {
     return room.getProducerTrasnport(id);
 }
 
-module.exports.addConsumerTrasport = function (id, transport, transports) {
-    transports[id] = transport;
-    console.log('consumerTransports count=' + Object.keys(transports).length);
-    return transports;
+module.exports.addConsumerTrasport = function (room, id, transport) {
+    room.addConsumerTrasport(id, transport);
+    console.log('=== addConsumerTrasport use room=%s ===', room.name);
 }
 
 module.exports.removeVideoConsumer = function (id, videoConsumers) {
@@ -117,10 +118,8 @@ module.exports.createConsumer = async function (transport, producer, rtpCapabili
     };
 }
 
-module.exports.addVideoConsumer = function (id, consumer, videoConsumers) {
-    videoConsumers[id] = consumer;
-    console.log('videoConsumers count=' + Object.keys(videoConsumers).length);
-    return videoConsumers;
+module.exports.addConsumerVA = function (room, id, consumer, kind) {
+    room.addConsumerSet(id, consumer, kind)
 }
 
 module.exports.removeVideoConsumer = function (id, videoConsumers) {
@@ -141,6 +140,6 @@ module.exports.removeAudioConsumer = function (id, audioConsumers) {
     return audioConsumers
 }
 
-module.exports.getVideoConsumer = function (id, videoConsumers) {
-    return videoConsumers[id];
+module.exports.getVideoConsumer = function (room,id, kind) {
+    return room.getConsumerSet(id, kind)
 }

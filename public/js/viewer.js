@@ -7,7 +7,10 @@ let consumerTransport = null;
 let videoConsumer = null;
 let audioConsumer = null;
 let videoID = null;
-let room = getRoomName();
+let roomName = getRoomName();
+if (roomName === null || typeof (roomName) === "undefined" || roomName === "") {
+    throw new Error("Please enter room name exmalple: ?room=mrtri on url");
+}
 
 // =========== socket.io ========== 
 let socket = null;
@@ -167,20 +170,20 @@ async function subscribe() {
             return;
         });
         // --- get capabilities --
-        const data = await sendRequest('getRouterRtpCapabilities', {});
+        const data = await sendRequest('getRouterRtpCapabilities', { roomName: roomName });
         console.log('getRouterRtpCapabilities:', data);
         await loadDevice(data);
     }
     // --- prepare transport ---
     console.log('--- createConsumerTransport --');
-    const params = await sendRequest('createConsumerTransport', {});
+    const params = await sendRequest('createConsumerTransport', { roomName: roomName });
     console.log('transport params:', params);
     consumerTransport = device.createRecvTransport(params);
     console.log('createConsumerTransport:', consumerTransport);
     // --- join & start publish --
     consumerTransport.on('connect', async ({ dtlsParameters }, callback, errback) => {
         console.log('--consumer trasnport connect');
-        sendRequest('connectConsumerTransport', { dtlsParameters: dtlsParameters })
+        sendRequest('connectConsumerTransport', { dtlsParameters: dtlsParameters, roomName: roomName })
             .then(callback)
             .catch(errback);
     });
@@ -230,7 +233,7 @@ async function consumeAndResume(transport, kind) {
         console.log('-- track exist, consumer ready. kind=' + kind);
         if (kind === 'video') {
             console.log('-- resume kind=' + kind);
-            sendRequest('resume', { kind: kind })
+            sendRequest('resume', { kind: kind, roomName: roomName })
                 .then(() => {
                     console.log('resume OK');
                     return consumer;
@@ -253,7 +256,7 @@ async function consume(transport, trackKind) {
     console.log('--start of consume --kind=' + trackKind);
     const { rtpCapabilities } = device;
     //const data = await socket.request('consume', { rtpCapabilities });
-    const data = await sendRequest('consume', { rtpCapabilities: rtpCapabilities, kind: trackKind })
+    const data = await sendRequest('consume', { rtpCapabilities: rtpCapabilities, kind: trackKind, roomName: roomName })
         .catch(err => {
             console.error('consume ERROR:', err);
         });

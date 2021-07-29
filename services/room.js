@@ -4,6 +4,7 @@ class Room {
     this.producerTransports = {};
     this.videoProducers = {};
     this.audioProducers = {};
+    this.own_id = "";
 
     this.consumerTransports = {};
     this.videoConsumerSets = {};
@@ -19,6 +20,14 @@ class Room {
   addProducerTrasport(id, transport) {
     this.producerTransports[id] = transport;
     console.log('room=%s producerTransports count=%d', this.name, Object.keys(this.producerTransports).length);
+  }
+
+  addOwnStream(id) {
+    this.own_id = id;
+  }
+
+  getOwnStream() {
+    return this.own_id;
   }
 
   removeProducerTransport(id) {
