@@ -115,9 +115,12 @@ async function init() {
         console.log('client connected. socket id=' + id + '  , total clients=' + helpers.getClientCount());
 
         socket.on('disconnect', function () {
+            const roomName = getRoomname();
             // close user connection
             console.log('client disconnected. socket id=' + id + '  , total clients=' + helpers.getClientCount());
-            cleanUpPeer(socket);
+            cleanUpPeer(roomName, socket);
+            // --- socket.io room ---
+            socket.leave(roomName);
         });
         // --- setup room ---
         socket.on('prepare_room', async (data) => {
@@ -127,9 +130,8 @@ async function init() {
                 console.log('--- use exist room. roomId=' + roomId);
             } else {
                 console.log('--- create new room. roomId=' + roomId);
-                const room = await setupRoom(roomId);
+                await setupRoom(roomId);
             }
-
             // --- socket.io room ---
             socket.join(roomId);
             setRoomname(roomId);
@@ -142,14 +144,7 @@ async function init() {
             console.error('client connection error', err);
         });
         socket.on('getRouterRtpCapabilities', (data, callback) => {
-            const { router } = Room.getRoom(data.roomName);
-            if (router) {
-                console.log('getRouterRtpCapabilities: ', router.rtpCapabilities);
-                helpers.sendResponse(router.rtpCapabilities, callback);
-            }
-            else {
-                helpers.sendReject({ text: 'ERROR- router NOT READY' }, callback);
-            }
+            getRouterRTP(data, callback);
         });
         // --- producer streamer ----
         socket.on('createProducerTransport', async (data, callback) => {
@@ -329,42 +324,59 @@ async function init() {
             socket.roomname = room;
         }
 
+        function getRouterRTP(data, callback) {
+            const room = Room.getRoom(data.roomName);
+            let numOfTries = 0;
+            if (room) {
+                const { router } = room;
+                if (router) {
+                    console.log('getRouterRtpCapabilities: ', router.rtpCapabilities);
+                    helpers.sendResponse(router.rtpCapabilities, callback);
+                }
+                else {
+                    helpers.sendReject({ text: 'ERROR- router NOT READY' }, callback);
+                }
+            } else if (numOfTries < 10) {
+                setTimeout(() => {
+                    console.log('try to get room');
+                    getRouterRTP(data, callback);
+                    numOfTries++;
+                    console.log("Number of trying: " + numOfTries);
+                }, 500);
+            } else {
+                helpers.sendReject({ text: 'ERROR- router NOT READY' }, callback);
+            }
+        }
+
         function getRoomname() {
             const room = socket.roomname;
             return room;
         }
     });
-    function cleanUpPeer(socket) {
+    function cleanUpPeer(roomname, socket) {
         const id = helpers.getId(socket);
-        const consumer = helpers_mediasoup.getVideoConsumer(id, videoConsumers);
-        if (consumer) {
-            consumer.close();
-            videoConsumers = helpers_mediasoup.removeVideoConsumer(id, videoConsumers);
-        }
-
-        const transport = helpers_mediasoup.getConsumerTrasnport(id, transports);
+        helpers_mediasoup.removeConsumerSetDeep(roomname, id);
+        const room = Room.getRoom(roomname);
+        const transport = helpers_mediasoup.getConsumerTrasnport(room, id);
         if (transport) {
             transport.close();
-            transports = helpers_mediasoup.removeConsumerTransport(id, transports);
+            helpers_mediasoup.removeConsumerTransport(room, id);
         }
 
-        if (producerSocketId === id) {
-            console.log('---- cleanup producer ---');
-            if (videoProducer) {
-                videoProducer.close();
-                videoProducer = null;
-            }
-            if (audioProducer) {
-                audioProducer.close();
-                audioProducer = null;
-            }
-
-            if (producerTransport) {
-                producerTransport.close();
-                producerTransport = null;
-            }
-
-            producerSocketId = null;
+        const videoProducer = helpers_mediasoup.getProducer(room, id, 'video');
+        if (videoProducer) {
+            videoProducer.close();
+            helpers_mediasoup.removeProducer(room, id, 'video');
+        }
+        const audioProducer = helpers_mediasoup.getProducer(room, id, 'audio');
+        if (audioProducer) {
+            audioProducer.close();
+            helpers_mediasoup.removeProducer(room, id, 'audio');
+        }
+        const producerTransport = helpers_mediasoup.getProducerTrasnport(room, id);
+        if (producerTransport) {
+            producerTransport.close();
+            helpers_mediasoup.removeProducerTransport(room, id);
         }
     }
     async function setupRoom(name) {

@@ -187,5 +187,5 @@ function disconnect() {
 
     disconnectSocket();
 }
-// auto publish video strem
+// auto publish video stream
 publish()

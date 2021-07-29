@@ -35,6 +35,11 @@ module.exports.addProducer = function (room, id, producer, kind) {
     console.log('=== addProducer use room=%s ===', room.name);
 }
 
+module.exports.removeConsumerSetDeep = function (roomname, localId) {
+    const room = Room.getRoom(roomname);
+    room.removeConsumerSetDeep(localId);
+}
+
 module.exports.removeProducerTransport = function (room, id) {
     room.removeProducerTransport(id);
 }
@@ -43,8 +48,12 @@ module.exports.getProducer = function (room, id, kind) {
     return room.getProducer(id, kind);
 }
 
-module.exports.getConsumerTrasnport = function (id, transports) {
-    return transports[id];
+module.exports.getConsumerTrasnport = function (room, id) {
+    return room.getConsumerTrasnport(id);
+}
+
+module.exports.getProducerTrasnport = function (room, id) {
+    return room.getProducerTrasnport(id);
 }
 
 module.exports.addConsumerTrasport = function (id, transport, transports) {
@@ -65,10 +74,8 @@ module.exports.removeAudioConsumer = function (id, audioConsumers) {
     return audioConsumers;
 }
 
-module.exports.removeConsumerTransport = function (id, transports) {
-    delete transports[id];
-    console.log('consumerTransports count=' + Object.keys(transports).length);
-    return transports;
+module.exports.removeConsumerTransport = function (room, id) {
+    room.removeConsumerTransport(id);
 }
 
 module.exports.createConsumer = async function (transport, producer, rtpCapabilities, router) {
