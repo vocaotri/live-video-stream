@@ -13,5 +13,5 @@ module.exports.sendResponse = function (response, callback) {
 }
 // --- send error to client ---
 module.exports.sendReject = function (error, callback) {
-    callback(error.toString(), null);
+    callback( JSON.stringify(error), null);
 }

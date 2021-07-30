@@ -189,8 +189,11 @@ const helpers_mediasoup = require("./helpers/helper_mediasoup");
         });
         // --- consumer viewer ----
         socket.on('createConsumerTransport', async (data, callback) => {
+            const roomId = data.roomName;
+            setRoomname(roomId);
+            socket.join(roomId);
+            console.log(socket.rooms);
             const room = Room.getRoom(data.roomName);
-            setRoomname(data.roomName);
             console.log('-- createConsumerTransport ---');
             const { transport, params } = await helpers_mediasoup.createTransport(room.router, mediasoupOptions);
             helpers_mediasoup.addConsumerTrasport(room, id, transport);

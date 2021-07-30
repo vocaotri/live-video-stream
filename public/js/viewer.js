@@ -53,13 +53,14 @@ function connectSocket() {
         });
         socket.on('newProducer', async function (message) {
             console.log('socket.io newProducer:', message);
+            const kind = message.kind;
             if (consumerTransport) {
                 // start consume
                 if (message.kind === 'video') {
-                    videoConsumer = await consumeAndResume(consumerTransport, message.kind);
+                    videoConsumer = await consumeAndResume(consumerTransport, kind);
                 }
                 else if (message.kind === 'audio') {
-                    audioConsumer = await consumeAndResume(consumerTransport, message.kind);
+                    audioConsumer = await consumeAndResume(consumerTransport, kind);
                 }
             }
         });
@@ -170,9 +171,17 @@ async function subscribe() {
             return;
         });
         // --- get capabilities --
-        const data = await sendRequest('getRouterRtpCapabilities', { roomName: roomName });
-        console.log('getRouterRtpCapabilities:', data);
-        await loadDevice(data);
+        try {
+            const data = await sendRequest('getRouterRtpCapabilities', { roomName: roomName });
+            console.log('getRouterRtpCapabilities:', data);
+            await loadDevice(data);
+        } catch (e) {
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000)
+            let val = JSON.parse(e)
+            throw new Error(val.text + "Streamer doesn't stream in room. The page will refresh after 2 seconds")
+        }
     }
     // --- prepare transport ---
     console.log('--- createConsumerTransport --');
@@ -228,7 +237,7 @@ function disconnect() {
     disconnectSocket();
 }
 async function consumeAndResume(transport, kind) {
-    const consumer = await consume(consumerTransport, kind);
+    const consumer = await consume(transport, kind);
     if (consumer) {
         console.log('-- track exist, consumer ready. kind=' + kind);
         if (kind === 'video') {
