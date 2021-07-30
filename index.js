@@ -37,7 +37,7 @@ global.Room = require('./services/room').Room
 global.mediasoup = require("mediasoup");
 const helpers_mediasoup = require("./helpers/helper_mediasoup");
 
-async function init() {
+(async function () {
     const mediasoupOptions = {
         // Worker settings
         worker: {
@@ -344,7 +344,4 @@ async function init() {
         Room.addRoom(room, name);
         return room;
     }
-}
-
-
-init()
+})();
