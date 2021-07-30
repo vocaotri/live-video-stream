@@ -238,9 +238,17 @@ const helpers_mediasoup = require("./helpers/helper_mediasoup");
                     console.log('consumer -- on.producerclose');
                     consumer.close();
                     helpers_mediasoup.removeConsumerSetDeep(room.name, id);
-
+                    if (room) {
+                        console.log('--broadcast room=%s producerclose ---' + room.name);
+                        socket.broadcast.to(room.name).emit('producerClosed', { localId: id, remoteId: "null", kind: kind });
+                        socket.emit('producerClosed', { localId: id, remoteId: "null", kind: kind });
+                    }
+                    else {
+                        console.log('--broadcast producerclose ---');
+                        socket.broadcast.emit('producerClosed', { localId: id, remoteId: "null", kind: kind });
+                    }
                     // -- notify to client ---
-                    socket.emit('producerClosed', { localId: id, remoteId: producerSocketId, kind: kind });
+                    // socket.emit('producerClosed', { localId: id, remoteId: producerSocketId, kind: kind });
                 });
                 console.log('-- consumer ready ---');
                 helpers.sendResponse(params, callback);

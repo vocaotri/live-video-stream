@@ -134,28 +134,38 @@ class Room {
 
   removeConsumerSetDeep(localId) {
     const videoSet = this.getConsumerSet(localId, 'video');
+    delete this.videoConsumerSets[localId];
     if (videoSet) {
-      for (const key in videoSet) {
-        const consumer = videoSet[key];
+      if (videoSet[0])
+        for (const key in videoSet) {
+          const consumer = videoSet[key];
+          consumer.close();
+          delete videoSet[key];
+        }
+      else {
+        const consumer = videoSet;
         consumer.close();
-        delete videoSet[key];
       }
 
       console.log('room=%s removeConsumerSetDeep video consumers count=%d', this.name, Object.keys(videoSet).length);
     }
-    delete this.videoConsumerSets[localId];
 
     const audioSet = this.getConsumerSet(localId, 'audio');
+    delete this.audioConsumerSets[localId];
     if (audioSet) {
-      for (const key in audioSet) {
-        const consumer = audioSet[key];
+      if (audioSet[0])
+        for (const key in audioSet) {
+          const consumer = audioSet[key];
+          consumer.close();
+          delete audioSet[key];
+        }
+      else {
+        const consumer = audioSet;
         consumer.close();
-        delete audioSet[key];
       }
 
       console.log('room=%s removeConsumerSetDeep audio consumers count=%d', this.name, Object.keys(audioSet).length);
     }
-    delete this.audioConsumerSets[localId];
   }
 
   getConsumer(localId, remoteId, kind) {

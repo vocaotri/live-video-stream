@@ -64,7 +64,6 @@ function connectSocket() {
                 }
             }
         });
-
         socket.on('producerClosed', function (message) {
             console.log('socket.io producerClosed:', message);
             const localId = message.localId;
@@ -111,10 +110,6 @@ function addRemoteTrack(id, track) {
     playVideo(video, newStream)
         .then(() => {
             video.muted = false
-            // let body = document.getElementsByTagName('body')[0];
-            // body.addEventListener("click", function () {
-            //     video.muted = false
-            // })
         })
         .catch(err => { console.error('media ERROR:', err) });
 }
@@ -241,16 +236,16 @@ async function consumeAndResume(transport, kind) {
     if (consumer) {
         console.log('-- track exist, consumer ready. kind=' + kind);
         if (kind === 'video') {
-            console.log('-- resume kind=' + kind);
-            sendRequest('resume', { kind: kind, roomName: roomName })
-                .then(() => {
-                    console.log('resume OK');
-                    return consumer;
-                })
-                .catch(err => {
-                    console.error('resume ERROR:', err);
-                    return consumer;
-                });
+        console.log('-- resume kind=' + kind);
+        sendRequest('resume', { kind: kind, roomName: roomName })
+            .then(() => {
+                console.log('resume OK');
+                return consumer;
+            })
+            .catch(err => {
+                console.error('resume ERROR:', err);
+                return consumer;
+            });
         }
         else {
             console.log('-- do not resume kind=' + kind);
